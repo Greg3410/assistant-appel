@@ -3,189 +3,306 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Test micro pendant l'appel</title>
+<title>Assistant d'appel</title>
 <style>
-/* Layout: one narrow column, two big test cards, readable while holding the phone */
+/* Layout: une colonne lisible posée sur la table; la réponse à lire en anglais est l'élément le plus gros. */
 :root{
-  --bg:#f3f5f7; --card:#ffffff; --fg:#17202a; --muted:#5b6876; --line:#d8dee5;
-  --accent:#1f5fbf; --ok:#1d7a46; --warn:#b06a00; --bad:#b3261e;
+  --bg:#f2f4f6; --card:#ffffff; --fg:#141b22; --muted:#5a6773; --line:#d6dde4;
+  --accent:#1f5fbf; --accent-soft:#e6eefb; --ok:#1d7a46; --bad:#b3261e; --me:#6b4fa8;
   --sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#11161c; --card:#1a2129; --fg:#e8edf2; --muted:#9aa7b4; --line:#2c3642;
-  --accent:#6ea3f0; --ok:#4cc483; --warn:#f0a83c; --bad:#f2786e; color-scheme: dark}}
+  --bg:#0f141a; --card:#182029; --fg:#e9eef3; --muted:#9aa7b3; --line:#2a3440;
+  --accent:#7aa9f2; --accent-soft:#1c2a3e; --ok:#4cc483; --bad:#f2786e; --me:#b59cf0; color-scheme: dark}}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--sans);
-  padding-block:max(16px,env(safe-area-inset-top,0px)) 32px;
-  padding-left:max(16px,env(safe-area-inset-left,0px));
-  padding-right:max(16px,env(safe-area-inset-right,0px))}
-main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-h1{font-size:1.4rem;margin:0;text-wrap:balance}
-h2{font-size:1.1rem;margin:0}
-p{margin:0}
-.muted{color:var(--muted);font-size:.95rem}
-ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
-button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:14px 16px;background:var(--accent);color:#fff;cursor:pointer}
+body{background:var(--bg);color:var(--fg);font:16px/1.45 var(--sans);
+  padding-block:12px 40px;
+  padding-left:max(14px,env(safe-area-inset-left,0px));
+  padding-right:max(14px,env(safe-area-inset-right,0px))}
+main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-size:1.2rem;margin:0;flex:1;min-width:0}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 16px;background:var(--accent);color:#fff;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);padding:8px 12px;font-weight:500}
 button.stop{background:var(--bad)}
-button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
-.meter{height:22px;border-radius:6px;background:var(--line);overflow:hidden}
-.meter>div{height:100%;width:0;background:var(--ok);transition:width .08s}
-.verdict{font-weight:600;padding:10px 12px;border-radius:8px;border:1px solid var(--line)}
-.verdict.ok{color:var(--ok);border-color:var(--ok)}
-.verdict.bad{color:var(--bad);border-color:var(--bad)}
-.verdict.warn{color:var(--warn);border-color:var(--warn)}
-.transcript{min-height:120px;max-height:40vh;overflow-y:auto;padding:12px;border-radius:8px;border:1px solid var(--line);font-size:1.15rem;white-space:pre-wrap}
-.interim{color:var(--muted)}
-.nums{font-variant-numeric:tabular-nums}
+button.small{padding:4px 10px;font-size:.85rem}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#btnStart{width:100%;padding:16px;font-size:1.1rem}
+.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.95rem;min-height:1.5em}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none}
+.dot.on{background:var(--ok);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.dot.on{animation:none}}
+.live{font-size:1.05rem;color:var(--muted);font-style:italic;min-height:1.4em}
+details.settings{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+details.settings summary{cursor:pointer;font-weight:600}
+.form{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:.9rem;color:var(--muted)}
+input,textarea,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:64px;resize:vertical}
+.hint{font-size:.85rem;color:var(--muted);margin:0}
+.feed{display:flex;flex-direction:column;gap:12px}
+.turn{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.turn.latest{border-color:var(--accent)}
+.who{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.en-heard{color:var(--muted)}
+.fr{font-size:1.1rem}
+.reply{background:var(--accent-soft);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.reply .say{font-size:1.45rem;font-weight:700;line-height:1.3}
+.reply .say-fr{color:var(--muted)}
+.turn.me{border-style:dashed}
+.turn.me .who{color:var(--me)}
+.err{color:var(--bad);font-weight:600}
+.empty{color:var(--muted);text-align:center;padding:24px 8px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
 <main>
-  <h1>Test micro pendant l'appel</h1>
-  <p class="muted">Ce test vérifie si Chrome peut entendre votre interlocuteur pendant un appel normal, en haut-parleur. Aucune donnée n'est enregistrée.</p>
+  <header>
+    <h1>Assistant d'appel</h1>
+    <button class="ghost" id="btnClear" type="button">Effacer</button>
+  </header>
 
-  <section class="card">
-    <h2>Mode d'emploi</h2>
-    <ol>
-      <li>Avant l'appel, lancez le test A et parlez : la barre doit bouger.</li>
-      <li>Appelez quelqu'un avec l'application Téléphone et mettez le haut-parleur.</li>
-      <li>Revenez sur Chrome (sans raccrocher), demandez à la personne de parler, puis lancez le test A, puis le test B.</li>
-      <li>Envoyez-moi une capture d'écran du résultat.</li>
-    </ol>
+  <details class="settings" id="settings">
+    <summary>Réglages et contexte de l'appel</summary>
+    <div class="form">
+      <label>Clé API Anthropic
+        <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-...">
+      </label>
+      <p class="hint">La clé reste enregistrée uniquement dans ce navigateur, sur cet appareil.</p>
+      <label>Modèle
+        <select id="model">
+          <option value="claude-opus-5-5">Claude Opus 5.5 (meilleure qualité)</option>
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (équilibré)</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5 (le plus rapide et le moins cher)</option>
+        </select>
+      </label>
+      <label>Qui je suis (nom, poste, société, ce que vous vendez ou faites)
+        <textarea id="ctxMe" placeholder="Ex. : Frédéric, gérant d'une entreprise de ... en France."></textarea>
+      </label>
+      <label>Mon interlocuteur
+        <textarea id="ctxThem" placeholder="Ex. : John, acheteur chez un fournisseur britannique."></textarea>
+      </label>
+      <label>Objectif de l'appel et points importants
+        <textarea id="ctxGoal" placeholder="Ex. : négocier le délai de livraison, prix maximum 12 € l'unité."></textarea>
+      </label>
+    </div>
+  </details>
+
+  <button id="btnStart" type="button">Démarrer l'écoute</button>
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">À l'arrêt</span></div>
+  <div class="live" id="live"></div>
+
+  <section class="feed" id="feed" aria-live="polite">
+    <div class="empty" id="empty">Posez cet appareil près du haut-parleur du téléphone et appuyez sur « Démarrer l'écoute ». Chaque phrase de votre interlocuteur apparaîtra ici avec sa traduction et une réponse à lire.</div>
   </section>
-
-  <section class="card">
-    <h2>Test A : niveau du micro</h2>
-    <button id="btnLevel">Lancer le test A</button>
-    <div class="meter"><div id="bar"></div></div>
-    <p class="muted nums" id="levelInfo">Niveau max : –</p>
-    <p class="verdict" id="levelVerdict" hidden></p>
-  </section>
-
-  <section class="card">
-    <h2>Test B : transcription en anglais</h2>
-    <button id="btnSpeech">Lancer le test B</button>
-    <div class="transcript" id="transcript"><span class="muted">Le texte anglais entendu s'affichera ici.</span></div>
-    <p class="verdict" id="speechVerdict" hidden></p>
-  </section>
-
-  <p class="muted" id="env"></p>
 </main>
 
-<script>
-const $ = id => document.getElementById(id);
-let wakeLock = null;
-async function keepAwake(){ try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){} }
-function verdict(el, cls, text){ el.hidden=false; el.className='verdict '+cls; el.textContent=text; }
+<script type="module">
+import Anthropic from "./anthropic-sdk-0.137.0.js";
 
-/* ---- Test A: raw mic level ---- */
-let stream=null, ctx=null, raf=null, levelTimer=null;
-$('btnLevel').onclick = async () => {
-  if (stream) return stopLevel();
-  stopSpeech();
-  $('levelVerdict').hidden = true;
-  try{
-    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}});
-  }catch(e){
-    verdict($('levelVerdict'),'bad','Accès au micro refusé ou impossible ('+e.name+'). Autorisez le micro pour ce site dans Chrome.');
-    stream=null; return;
-  }
-  keepAwake();
-  ctx = new (window.AudioContext||window.webkitAudioContext)();
-  const an = ctx.createAnalyser(); an.fftSize = 1024;
-  ctx.createMediaStreamSource(stream).connect(an);
-  const buf = new Float32Array(an.fftSize);
-  let peak = 0;
-  const t0 = performance.now();
-  $('btnLevel').textContent='Arrêter le test A'; $('btnLevel').classList.add('stop');
-  const loop = () => {
-    an.getFloatTimeDomainData(buf);
-    let s=0; for (const v of buf) s+=v*v;
-    const rms = Math.sqrt(s/buf.length);
-    const pct = Math.min(100, rms*400);
-    peak = Math.max(peak, pct);
-    $('bar').style.width = pct+'%';
-    $('levelInfo').textContent = 'Niveau max : '+peak.toFixed(1)+' / 100 ('+Math.round((performance.now()-t0)/1000)+' s)';
-    raf = requestAnimationFrame(loop);
-  };
-  loop();
-  levelTimer = setTimeout(() => {
-    const p = peak;
-    stopLevel();
-    if (p < 0.5) verdict($('levelVerdict'),'bad','Silence total : Android coupe le micro pour Chrome pendant l\'appel.');
-    else if (p < 4) verdict($('levelVerdict'),'warn','Son très faible. Montez le volume du haut-parleur et réessayez.');
-    else verdict($('levelVerdict'),'ok','Le micro capte du son. Passez au test B.');
-  }, 10000);
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d=''){ try{ return localStorage.getItem('aa_'+k) ?? d; }catch(_){ return d; } },
+  set(k, v){ try{ localStorage.setItem('aa_'+k, v); }catch(_){} }
 };
-function stopLevel(){
-  clearTimeout(levelTimer); cancelAnimationFrame(raf);
-  stream?.getTracks().forEach(t=>t.stop()); stream=null;
-  ctx?.close(); ctx=null;
-  $('bar').style.width='0';
-  $('btnLevel').textContent='Lancer le test A'; $('btnLevel').classList.remove('stop');
+
+/* ---------- Réglages ---------- */
+for (const id of ['apiKey','model','ctxMe','ctxThem','ctxGoal']){
+  const el = $(id); const saved = store.get(id);
+  if (saved) el.value = saved;
+  el.addEventListener('input', () => store.set(id, el.value));
+  el.addEventListener('change', () => store.set(id, el.value));
+}
+if (!store.get('apiKey')) $('settings').open = true;
+
+/* ---------- État de la conversation ---------- */
+// turns: {who:'them'|'me', en, fr?, replyEn?, replyFr?, el}
+let turns = [];
+let listening = false, rec = null, wakeLock = null;
+let pending = '', silenceTimer = null;
+const SILENCE_MS = 1300;
+
+function setStatus(text, on){ $('statusText').textContent = text; $('dot').classList.toggle('on', !!on); }
+
+/* ---------- Affichage ---------- */
+function renderTurn(t){
+  if (!t.el){
+    t.el = document.createElement('article');
+    $('feed').prepend(t.el);
+  }
+  $('empty').hidden = true;
+  document.querySelectorAll('.turn.latest').forEach(e => e.classList.remove('latest'));
+  const el = t.el;
+  el.className = 'turn ' + (t.who === 'me' ? 'me' : 'latest');
+  el.replaceChildren();
+  const who = document.createElement('div'); who.className = 'who';
+  const label = document.createElement('span');
+  label.textContent = t.who === 'me' ? 'Vous' : 'Interlocuteur';
+  who.appendChild(label);
+  if (t.who === 'them'){
+    const b = document.createElement('button'); b.className = 'ghost small'; b.type = 'button';
+    b.textContent = "C'était moi";
+    b.onclick = () => { t.who = 'me'; t.abort?.abort(); delete t.fr; delete t.replyEn; delete t.replyFr; delete t.error; renderTurn(t); };
+    who.appendChild(b);
+  }
+  el.appendChild(who);
+  const heard = document.createElement('div'); heard.className = 'en-heard'; heard.textContent = t.en; el.appendChild(heard);
+  if (t.who === 'me') return;
+  if (t.fr){ const fr = document.createElement('div'); fr.className = 'fr'; fr.textContent = t.fr; el.appendChild(fr); }
+  if (t.replyEn || t.replyFr){
+    const r = document.createElement('div'); r.className = 'reply';
+    const say = document.createElement('div'); say.className = 'say'; say.textContent = t.replyEn || '…'; r.appendChild(say);
+    if (t.replyFr){ const sf = document.createElement('div'); sf.className = 'say-fr'; sf.textContent = t.replyFr; r.appendChild(sf); }
+    el.appendChild(r);
+  } else if (!t.fr && !t.error){
+    const w = document.createElement('div'); w.className = 'hint'; w.textContent = 'Traduction en cours…'; el.appendChild(w);
+  }
+  if (t.error){ const e = document.createElement('div'); e.className = 'err'; e.textContent = t.error; el.appendChild(e); }
 }
 
-/* ---- Test B: speech recognition (en-US) ---- */
+/* ---------- Reconnaître votre propre voix ---------- */
+const words = s => s.toLowerCase().replace(/[^a-z0-9' ]+/g,' ').split(/\s+/).filter(Boolean);
+function looksLikeMyReply(text){
+  const last = [...turns].reverse().find(t => t.who === 'them' && t.replyEn);
+  if (!last) return false;
+  const said = words(text), sugg = new Set(words(last.replyEn));
+  if (said.length < 2) return false;
+  const hits = said.filter(w => sugg.has(w)).length;
+  return hits / said.length >= 0.6;
+}
+
+/* ---------- Claude ---------- */
+function systemPrompt(){
+  return `You assist a French professional during a live phone call in English. His English is limited: he reads your suggested reply aloud himself.
+
+About him: ${$('ctxMe').value || '(not provided)'}
+The other person: ${$('ctxThem').value || '(not provided)'}
+Goal of the call: ${$('ctxGoal').value || '(not provided)'}
+
+For the other person's latest utterance, answer in exactly this format, with nothing before or after:
+FR: <faithful French translation of the latest utterance>
+EN: <the reply he should say, in English>
+FR_REPLY: <French translation of that reply>
+
+Rules for the EN reply: natural, polite, professional spoken English; one to three short sentences; simple words that are easy for a French speaker to pronounce; move the call toward his goal; never invent facts, prices or commitments he did not provide. If he needs information you do not have, suggest a reply that buys time or asks a clarifying question (for example, offering to confirm by email). If the transcription looks garbled or incomplete, suggest politely asking the person to repeat.`;
+}
+
+function transcriptFor(t){
+  const lines = turns.filter(x => x !== t).slice(-20).map(x => (x.who === 'me' ? 'Me (French professional): ' : 'Them: ') + x.en);
+  return `Conversation so far (automatic speech transcription, may contain errors):\n${lines.join('\n') || '(start of the call)'}\n\nTheir latest utterance:\n${t.en}`;
+}
+
+function parseOut(text, t){
+  const get = (key, next) => {
+    const re = new RegExp('(?:^|\\n)'+key+':\\s*([\\s\\S]*?)'+(next ? '(?=\\n'+next+':|$)' : '$'));
+    const m = text.match(re); return m ? m[1].trim() : '';
+  };
+  t.fr = get('FR', 'EN'); t.replyEn = get('EN', 'FR_REPLY'); t.replyFr = get('FR_REPLY');
+}
+
+async function respond(t){
+  const key = $('apiKey').value.trim();
+  if (!key){ t.error = 'Ajoutez votre clé API dans « Réglages » pour obtenir la traduction et les réponses.'; renderTurn(t); return; }
+  const model = $('model').value;
+  const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+  const params = {
+    model, max_tokens: 4000,
+    output_config: { effort: 'low' },
+    system: systemPrompt(),
+    messages: [{ role: 'user', content: transcriptFor(t) }],
+  };
+  if (model !== 'claude-haiku-5-5'){ params.betas = ['server-side-fallback-2026-07-01']; params.fallbacks = 'default'; }
+  t.abort = new AbortController();
+  try{
+    const stream = client.beta.messages.stream(params, { signal: t.abort.signal });
+    let text = '';
+    stream.on('text', delta => { text += delta; parseOut(text, t); renderTurn(t); });
+    const final = await stream.finalMessage();
+    if (final.stop_reason === 'refusal' && !text){ t.error = "L'IA a refusé cette demande. Reformulez ou continuez l'appel."; }
+    parseOut(text, t);
+  }catch(e){
+    if (t.who === 'me') return;
+    const s = e?.status;
+    t.error = s === 401 ? 'Clé API refusée. Vérifiez-la dans « Réglages ».'
+            : s === 429 ? 'Trop de demandes ou crédit épuisé. Vérifiez votre solde sur console.anthropic.com.'
+            : s === 400 && /credit/i.test(e.message) ? 'Crédit API épuisé. Rechargez sur console.anthropic.com.'
+            : 'Erreur de connexion à l\'IA : ' + (e?.message || e);
+  }
+  if (t.who === 'them') renderTurn(t);
+}
+
+/* ---------- Fin de phrase ---------- */
+function commitUtterance(){
+  const text = pending.trim(); pending = ''; $('live').textContent = '';
+  if (!text) return;
+  const t = { who: looksLikeMyReply(text) ? 'me' : 'them', en: text };
+  turns.push(t); renderTurn(t);
+  if (t.who === 'them') respond(t);
+  try{ rec?.abort(); }catch(_){}  // remet la reconnaissance à zéro pour la phrase suivante
+}
+
+/* ---------- Reconnaissance vocale ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec=null, finalText='', finals=[], heard=false;
-$('btnSpeech').onclick = () => {
-  if (rec) return stopSpeech(true);
-  stopLevel();
-  if (!SR){ verdict($('speechVerdict'),'bad','Ce navigateur ne propose pas la reconnaissance vocale. Ouvrez la page dans Chrome.'); return; }
-  keepAwake();
-  finalText=''; finals=[]; heard=false; $('speechVerdict').hidden=true;
-  $('transcript').innerHTML='<span class="muted">J\'écoute…</span>';
-  rec = new SR(); rec.lang='en-US'; rec.continuous=true; rec.interimResults=true;
+function startRec(){
+  rec = new SR(); rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = true;
+  let finals = [];
   rec.onresult = e => {
-    let interim='';
-    for (let i=e.resultIndex;i<e.results.length;i++){
-      const r=e.results[i];
-      const t=r[0].transcript.trim();
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      const r = e.results[i], tx = r[0].transcript.trim();
+      if (!tx) continue;
       if (r.isFinal){
-        /* Chrome Android renvoie parfois la phrase en cours comme résultat final à chaque mot :
-           si le nouveau texte prolonge le précédent, on remplace au lieu d'ajouter. */
+        // Chrome Android renvoie la phrase en cours à chaque mot : on remplace au lieu d'ajouter.
         const last = finals.length ? finals[finals.length-1] : '';
-        if (last && t.toLowerCase().startsWith(last.toLowerCase())) finals[finals.length-1]=t;
-        else if (!(last && last.toLowerCase().startsWith(t.toLowerCase()))) finals.push(t);
-      } else {
-        interim = t;
-      }
+        if (last && tx.toLowerCase().startsWith(last.toLowerCase())) finals[finals.length-1] = tx;
+        else if (!(last && last.toLowerCase().startsWith(tx.toLowerCase()))) finals.push(tx);
+      } else interim = tx;
     }
     const last = finals.length ? finals[finals.length-1] : '';
-    if (interim && last && interim.toLowerCase().startsWith(last.toLowerCase())){
-      finals[finals.length-1]=interim; interim='';
-    }
-    finalText = finals.join('\n');
-    heard = true;
-    const box=$('transcript'); box.textContent=finalText;
-    if (interim){ const s=document.createElement('span'); s.className='interim'; s.textContent=(finalText?'\n':'')+interim; box.appendChild(s); }
-    box.scrollTop=box.scrollHeight;
-    verdict($('speechVerdict'),'ok','Ça marche : Chrome entend et transcrit l\'anglais pendant l\'appel.');
+    if (interim && last && interim.toLowerCase().startsWith(last.toLowerCase())){ finals[finals.length-1] = interim; interim = ''; }
+    pending = [...finals, interim].filter(Boolean).join(' ');
+    $('live').textContent = pending;
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(commitUtterance, SILENCE_MS);
   };
   rec.onerror = e => {
-    const msg = {
-      'not-allowed':'Micro refusé pour ce site. Autorisez-le dans Chrome.',
-      'no-speech':'Aucune parole détectée. Demandez à la personne de parler plus fort.',
-      'audio-capture':'Le micro est indisponible : probablement réservé par l\'appel.',
-      'network':'Pas de connexion internet pour la reconnaissance vocale.'
-    }[e.error] || ('Erreur : '+e.error);
-    verdict($('speechVerdict'), heard?'warn':'bad', msg);
+    if (e.error === 'not-allowed'){ stopListening(); setStatus('Micro refusé : autorisez-le pour ce site dans Chrome.', false); }
+    else if (e.error === 'audio-capture'){ setStatus('Micro indisponible sur cet appareil.', false); }
+    else if (e.error === 'network'){ setStatus('Pas de connexion internet pour la reconnaissance vocale.', true); }
   };
-  rec.onend = () => { if (rec){ try{ rec.start(); }catch(_){} } }; // keep listening
-  try{ rec.start(); }catch(e){ verdict($('speechVerdict'),'bad','Impossible de démarrer : '+e.message); rec=null; return; }
-  $('btnSpeech').textContent='Arrêter le test B'; $('btnSpeech').classList.add('stop');
-};
-function stopSpeech(user){
-  if (!rec) return;
-  const r=rec; rec=null; try{ r.stop(); }catch(_){}
-  $('btnSpeech').textContent='Lancer le test B'; $('btnSpeech').classList.remove('stop');
-  if (user && !heard) verdict($('speechVerdict'),'bad','Rien n\'a été transcrit pendant le test.');
+  rec.onend = () => { if (listening) setTimeout(() => { if (listening) startRec(); }, 150); };
+  try{ rec.start(); }catch(_){}
 }
 
-$('env').textContent = 'Appareil : '+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/,'$1');
+async function startListening(){
+  if (!SR){ setStatus('Ce navigateur ne propose pas la reconnaissance vocale. Utilisez Chrome.', false); return; }
+  listening = true;
+  try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(_){}
+  startRec();
+  $('btnStart').textContent = "Arrêter l'écoute"; $('btnStart').classList.add('stop');
+  setStatus("J'écoute votre interlocuteur…", true);
+}
+function stopListening(){
+  listening = false; clearTimeout(silenceTimer);
+  if (pending.trim()) commitUtterance();
+  try{ rec?.abort(); }catch(_){} rec = null;
+  try{ wakeLock?.release(); }catch(_){} wakeLock = null;
+  $('btnStart').textContent = "Démarrer l'écoute"; $('btnStart').classList.remove('stop');
+  setStatus('À l\'arrêt', false);
+}
+$('btnStart').onclick = () => listening ? stopListening() : startListening();
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && listening){ try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(_){} }
+});
+
+$('btnClear').onclick = () => {
+  turns.forEach(t => t.abort?.abort()); turns = [];
+  $('feed').querySelectorAll('.turn').forEach(e => e.remove()); $('empty').hidden = false;
+};
 </script>
 </body>
 </html>

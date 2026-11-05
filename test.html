@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Test micro pendant l'appel</title>
+<style>
+/* Layout: one narrow column, two big test cards, readable while holding the phone */
+:root{
+  --bg:#f3f5f7; --card:#ffffff; --fg:#17202a; --muted:#5b6876; --line:#d8dee5;
+  --accent:#1f5fbf; --ok:#1d7a46; --warn:#b06a00; --bad:#b3261e;
+  --sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#11161c; --card:#1a2129; --fg:#e8edf2; --muted:#9aa7b4; --line:#2c3642;
+  --accent:#6ea3f0; --ok:#4cc483; --warn:#f0a83c; --bad:#f2786e; color-scheme: dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--sans);
+  padding-block:max(16px,env(safe-area-inset-top,0px)) 32px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-size:1.4rem;margin:0;text-wrap:balance}
+h2{font-size:1.1rem;margin:0}
+p{margin:0}
+.muted{color:var(--muted);font-size:.95rem}
+ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:14px 16px;background:var(--accent);color:#fff;cursor:pointer}
+button.stop{background:var(--bad)}
+button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.meter{height:22px;border-radius:6px;background:var(--line);overflow:hidden}
+.meter>div{height:100%;width:0;background:var(--ok);transition:width .08s}
+.verdict{font-weight:600;padding:10px 12px;border-radius:8px;border:1px solid var(--line)}
+.verdict.ok{color:var(--ok);border-color:var(--ok)}
+.verdict.bad{color:var(--bad);border-color:var(--bad)}
+.verdict.warn{color:var(--warn);border-color:var(--warn)}
+.transcript{min-height:120px;max-height:40vh;overflow-y:auto;padding:12px;border-radius:8px;border:1px solid var(--line);font-size:1.15rem;white-space:pre-wrap}
+.interim{color:var(--muted)}
+.nums{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<main>
+  <h1>Test micro pendant l'appel</h1>
+  <p class="muted">Ce test vérifie si Chrome peut entendre votre interlocuteur pendant un appel normal, en haut-parleur. Aucune donnée n'est enregistrée.</p>
+
+  <section class="card">
+    <h2>Mode d'emploi</h2>
+    <ol>
+      <li>Avant l'appel, lancez le test A et parlez : la barre doit bouger.</li>
+      <li>Appelez quelqu'un avec l'application Téléphone et mettez le haut-parleur.</li>
+      <li>Revenez sur Chrome (sans raccrocher), demandez à la personne de parler, puis lancez le test A, puis le test B.</li>
+      <li>Envoyez-moi une capture d'écran du résultat.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Test A : niveau du micro</h2>
+    <button id="btnLevel">Lancer le test A</button>
+    <div class="meter"><div id="bar"></div></div>
+    <p class="muted nums" id="levelInfo">Niveau max : –</p>
+    <p class="verdict" id="levelVerdict" hidden></p>
+  </section>
+
+  <section class="card">
+    <h2>Test B : transcription en anglais</h2>
+    <button id="btnSpeech">Lancer le test B</button>
+    <div class="transcript" id="transcript"><span class="muted">Le texte anglais entendu s'affichera ici.</span></div>
+    <p class="verdict" id="speechVerdict" hidden></p>
+  </section>
+
+  <p class="muted" id="env"></p>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let wakeLock = null;
+async function keepAwake(){ try{ wakeLock = await navigator.wakeLock?.request('screen'); }catch(e){} }
+function verdict(el, cls, text){ el.hidden=false; el.className='verdict '+cls; el.textContent=text; }
+
+/* ---- Test A: raw mic level ---- */
+let stream=null, ctx=null, raf=null, levelTimer=null;
+$('btnLevel').onclick = async () => {
+  if (stream) return stopLevel();
+  stopSpeech();
+  $('levelVerdict').hidden = true;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}});
+  }catch(e){
+    verdict($('levelVerdict'),'bad','Accès au micro refusé ou impossible ('+e.name+'). Autorisez le micro pour ce site dans Chrome.');
+    stream=null; return;
+  }
+  keepAwake();
+  ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const an = ctx.createAnalyser(); an.fftSize = 1024;
+  ctx.createMediaStreamSource(stream).connect(an);
+  const buf = new Float32Array(an.fftSize);
+  let peak = 0;
+  const t0 = performance.now();
+  $('btnLevel').textContent='Arrêter le test A'; $('btnLevel').classList.add('stop');
+  const loop = () => {
+    an.getFloatTimeDomainData(buf);
+    let s=0; for (const v of buf) s+=v*v;
+    const rms = Math.sqrt(s/buf.length);
+    const pct = Math.min(100, rms*400);
+    peak = Math.max(peak, pct);
+    $('bar').style.width = pct+'%';
+    $('levelInfo').textContent = 'Niveau max : '+peak.toFixed(1)+' / 100 ('+Math.round((performance.now()-t0)/1000)+' s)';
+    raf = requestAnimationFrame(loop);
+  };
+  loop();
+  levelTimer = setTimeout(() => {
+    const p = peak;
+    stopLevel();
+    if (p < 0.5) verdict($('levelVerdict'),'bad','Silence total : Android coupe le micro pour Chrome pendant l\'appel.');
+    else if (p < 4) verdict($('levelVerdict'),'warn','Son très faible. Montez le volume du haut-parleur et réessayez.');
+    else verdict($('levelVerdict'),'ok','Le micro capte du son. Passez au test B.');
+  }, 10000);
+};
+function stopLevel(){
+  clearTimeout(levelTimer); cancelAnimationFrame(raf);
+  stream?.getTracks().forEach(t=>t.stop()); stream=null;
+  ctx?.close(); ctx=null;
+  $('bar').style.width='0';
+  $('btnLevel').textContent='Lancer le test A'; $('btnLevel').classList.remove('stop');
+}
+
+/* ---- Test B: speech recognition (en-US) ---- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec=null, finalText='', finals=[], heard=false;
+$('btnSpeech').onclick = () => {
+  if (rec) return stopSpeech(true);
+  stopLevel();
+  if (!SR){ verdict($('speechVerdict'),'bad','Ce navigateur ne propose pas la reconnaissance vocale. Ouvrez la page dans Chrome.'); return; }
+  keepAwake();
+  finalText=''; finals=[]; heard=false; $('speechVerdict').hidden=true;
+  $('transcript').innerHTML='<span class="muted">J\'écoute…</span>';
+  rec = new SR(); rec.lang='en-US'; rec.continuous=true; rec.interimResults=true;
+  rec.onresult = e => {
+    let interim='';
+    for (let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      const t=r[0].transcript.trim();
+      if (r.isFinal){
+        /* Chrome Android renvoie parfois la phrase en cours comme résultat final à chaque mot :
+           si le nouveau texte prolonge le précédent, on remplace au lieu d'ajouter. */
+        const last = finals.length ? finals[finals.length-1] : '';
+        if (last && t.toLowerCase().startsWith(last.toLowerCase())) finals[finals.length-1]=t;
+        else if (!(last && last.toLowerCase().startsWith(t.toLowerCase()))) finals.push(t);
+      } else {
+        interim = t;
+      }
+    }
+    const last = finals.length ? finals[finals.length-1] : '';
+    if (interim && last && interim.toLowerCase().startsWith(last.toLowerCase())){
+      finals[finals.length-1]=interim; interim='';
+    }
+    finalText = finals.join('\n');
+    heard = true;
+    const box=$('transcript'); box.textContent=finalText;
+    if (interim){ const s=document.createElement('span'); s.className='interim'; s.textContent=(finalText?'\n':'')+interim; box.appendChild(s); }
+    box.scrollTop=box.scrollHeight;
+    verdict($('speechVerdict'),'ok','Ça marche : Chrome entend et transcrit l\'anglais pendant l\'appel.');
+  };
+  rec.onerror = e => {
+    const msg = {
+      'not-allowed':'Micro refusé pour ce site. Autorisez-le dans Chrome.',
+      'no-speech':'Aucune parole détectée. Demandez à la personne de parler plus fort.',
+      'audio-capture':'Le micro est indisponible : probablement réservé par l\'appel.',
+      'network':'Pas de connexion internet pour la reconnaissance vocale.'
+    }[e.error] || ('Erreur : '+e.error);
+    verdict($('speechVerdict'), heard?'warn':'bad', msg);
+  };
+  rec.onend = () => { if (rec){ try{ rec.start(); }catch(_){} } }; // keep listening
+  try{ rec.start(); }catch(e){ verdict($('speechVerdict'),'bad','Impossible de démarrer : '+e.message); rec=null; return; }
+  $('btnSpeech').textContent='Arrêter le test B'; $('btnSpeech').classList.add('stop');
+};
+function stopSpeech(user){
+  if (!rec) return;
+  const r=rec; rec=null; try{ r.stop(); }catch(_){}
+  $('btnSpeech').textContent='Lancer le test B'; $('btnSpeech').classList.remove('stop');
+  if (user && !heard) verdict($('speechVerdict'),'bad','Rien n\'a été transcrit pendant le test.');
+}
+
+$('env').textContent = 'Appareil : '+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/,'$1');
+</script>
+</body>
+</html>

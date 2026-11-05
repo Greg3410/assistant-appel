@@ -83,6 +83,9 @@ textarea{min-height:64px;resize:vertical}
       <label>Qui je suis (nom, poste, société, ce que vous vendez ou faites)
         <textarea id="ctxMe" placeholder="Ex. : Frédéric, gérant d'une entreprise de ... en France."></textarea>
       </label>
+      <label>Mon CV et mon parcours (collez le texte du CV, ou la fiche que Claude vous a préparée)
+        <textarea id="ctxCv" style="min-height:120px" placeholder="Expériences, dates, réalisations chiffrées, compétences, diplômes, langues..."></textarea>
+      </label>
       <label>Mon interlocuteur
         <textarea id="ctxThem" placeholder="Ex. : John, acheteur chez un fournisseur britannique."></textarea>
       </label>
@@ -111,7 +114,7 @@ const store = {
 };
 
 /* ---------- Réglages ---------- */
-for (const id of ['apiKey','model','ctxMe','ctxThem','ctxGoal']){
+for (const id of ['apiKey','model','ctxMe','ctxCv','ctxThem','ctxGoal']){
   const el = $(id); const saved = store.get(id);
   if (saved) el.value = saved;
   el.addEventListener('input', () => store.set(id, el.value));
@@ -180,6 +183,7 @@ function systemPrompt(){
   return `You assist a French professional during a live phone call in English. His English is limited: he reads your suggested reply aloud himself.
 
 About him: ${$('ctxMe').value || '(not provided)'}
+His CV and background (use only these facts when he talks about himself): ${$('ctxCv').value || '(not provided)'}
 The other person: ${$('ctxThem').value || '(not provided)'}
 Goal of the call: ${$('ctxGoal').value || '(not provided)'}
 
@@ -188,7 +192,7 @@ FR: <faithful French translation of the latest utterance>
 EN: <the reply he should say, in English>
 FR_REPLY: <French translation of that reply>
 
-Rules for the EN reply: natural, polite, professional spoken English; one to three short sentences; simple words that are easy for a French speaker to pronounce; move the call toward his goal; never invent facts, prices or commitments he did not provide. If he needs information you do not have, suggest a reply that buys time or asks a clarifying question (for example, offering to confirm by email). If the transcription looks garbled or incomplete, suggest politely asking the person to repeat.`;
+Rules for the EN reply: natural, polite, professional spoken English; one to three short sentences; simple words that are easy for a French speaker to pronounce; move the call toward his goal; never invent facts, experience, figures, prices or commitments he did not provide. In a job interview, answer questions about his career in the first person using concrete facts from his CV. If he needs information you do not have, suggest a reply that buys time or asks a clarifying question (for example, offering to confirm by email). If the transcription looks garbled or incomplete, suggest politely asking the person to repeat.`;
 }
 
 function transcriptFor(t){
